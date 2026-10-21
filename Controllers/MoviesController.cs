@@ -1,8 +1,9 @@
 
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.Rendering;
 using Microsoft.EntityFrameworkCore;
-using MvcMovie.Models;
 using MvcMovie.Data;
+using MvcMovie.Models;
 
 public class MoviesController : Controller
 {
@@ -13,28 +14,39 @@ public class MoviesController : Controller
         _context = context;
     }
 
-    // GET: MOVIES
-    public async Task<IActionResult> Index()    
+    // GET: Movies
+    public async Task<IActionResult> Index(string movieGenre, string searchString)
     {
-        return View(await _context.Movie.ToListAsync());
-    }
-
-    // GET: MOVIES/Details/5
-    public async Task<IActionResult> Details(int? id)
-    {
-        if (id == null)
+        if (_context.Movie == null)
         {
-            return NotFound();
+            return Problem("Entity set 'MvcMovieContext.Movie'  is null.");
         }
 
-        var movie = await _context.Movie
-            .FirstOrDefaultAsync(m => m.Id == id);
-        if (movie == null)
+        // Use LINQ to get list of genres.
+        IQueryable<string> genreQuery = from m in _context.Movie
+                                        orderby m.Genre
+                                        select m.Genre;
+        var movies = from m in _context.Movie
+                     select m;
+
+        if (!string.IsNullOrEmpty(searchString))
         {
-            return NotFound();
+            movies = movies.Where(s => s.Title!.ToUpper().Contains(searchString.ToUpper()));
         }
 
-        return View(movie);
+        if (!string.IsNullOrEmpty(movieGenre))
+        {
+            movies = movies.Where(x => x.Genre == movieGenre);
+        }
+
+        var movieGenreVM = new MovieGenreViewModel
+        {
+            Genres = new SelectList(await genreQuery.Distinct().ToListAsync()),
+            Movies = await movies.ToListAsync()
+        };
+
+        return View(movieGenreVM);
+
     }
 
     // GET: MOVIES/Create
